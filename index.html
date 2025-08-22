@@ -58,12 +58,89 @@
 <script>
   "use strict";
 
+  const commentsData = [
+    {
+      id: 1,
+      name: "Ivan Ivanov",
+      date: "22.05.25 13:15",
+      text: "Первый комментарий",
+      likes: 3,
+      isLiked: false
+    },
+    {
+      id: 2,
+      name: "Daria Antonova",
+      date: "20.08.25 09:18",
+      text: "Второй комментарий",
+      likes: 4,
+      isLiked: true
+    }
+  ];
+
   const nameInput = document.querySelector('.add-form-name');
   const textInput = document.querySelector('.add-form-text');
   const addButton = document.querySelector('.add-form-button');
-  const commentsList = document.querySelector('.comments')
+  const commentsList = document.querySelector('.comments');
 
-  function addComment () { 
+  function renderComments() {
+    commentsList.innerHTML = '';
+
+    commentsData.forEach((comment) => {
+      const likeButtonClass = comment.isLiked ? 'like-button -active-like' : 'like-button';
+
+      const commentHTML = `
+      <li class="comment" data-id="${comment.id}">
+        <div class="comment-header">
+          <div>${comment.name}</div>
+          <div>${comment.date}</div>
+          </div>
+          <div class="comment-body">
+            <div class="comment-text">
+              ${comment.text}
+              </div>
+              </div>
+              <div class="comment-footer">
+                <div class="likes">
+                  <span class="likes-counter">${comment.likes}</span>
+                  <button class="${likeButtonClass}" data-id="${comment.id}"></button>
+                  </div>
+                  </div>
+                  </li>
+                  `;
+
+      commentsList.innerHTML += commentHTML;
+    });
+
+    initLikeButtons();
+  }
+
+  function initLikeButtons() {
+    const likeButtons = document.querySelectorAll('.like-button');
+
+    likeButtons.forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const commentId = parseInt(button.dataset.id);
+        const comment = commentsData.find(c => c.id === commentId);
+
+        if (comment) {
+          if (comment.isLiked) {
+            comment.likes--;
+            comment.isLiked = false;
+          } else {
+            comment.likes++;
+            comment.isLiked = true;
+          }
+
+          renderComments();
+        }
+      });
+    });
+  }
+
+
+
+  function addComment() {
     if (nameInput.value.trim() === '' || textInput.value.trim() === '') {
       alert('Пожалуйста, заполните все поля!');
       return;
@@ -71,32 +148,26 @@
 
     const currentDate = new Date();
     const formattedDate = `${currentDate.getDate().toString().padStart(2, '0')}.${(currentDate.getMonth() + 1).toString().padStart(2, '0')}.${currentDate.getFullYear().toString().slice(-2)} ${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}`;
-    const newCommentHTML = `
-    <li class="comment">
-      <div class="comment-header">
-        <div>${nameInput.value}</div>
-        <div>${formattedDate}</div>
-        </div>
-        <div class="comment-body">
-          <div class="comment-text">
-            ${textInput.value}
-            </div>
-            </div>
-            <div class="comment-footer">
-            <div class="likes">
-              <span class="likes-counter">0</span>
-              <button class="like-button"></button>
-              </div>
-              </div>
-              </li>
-              `;
 
-    commentsList.innerHTML += newCommentHTML;
-    nameInput.value = ''; 
-    textInput.value = ''; 
-            }
-    
-    addButton.addEventListener('click', addComment); 
+    const newComment = {
+      id: Date.now(),
+      name: nameInput.value,
+      date: formattedDate,
+      text: textInput.value,
+      likes: 0,
+      isLiked: false
+    };
+
+    commentsData.push(newComment);
+    renderComments();
+    nameInput.value = '';
+    textInput.value = '';
+  }
+
+  function initApp() {
+    renderComments();
+
+    addButton.addEventListener('click', addComment);
 
     textInput.addEventListener('keypress', (event) => {
       if (event.key === 'Enter' && !event.shiftKey) {
@@ -104,7 +175,10 @@
         addComment();
       }
     });
-    
+  }
+
+  document.addEventListener('DOMContentLoaded', initApp);
+
 
   console.log("It works!");
 </script>
