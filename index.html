@@ -142,12 +142,13 @@
     }
   }
 
-  function initLikeButtons() {
+  function initLikeButtons () {
     const likeButtons = document.querySelectorAll('.like-button');
 
     likeButtons.forEach((button) => {
       button.addEventListener('click', (event) => {
         event.stopPropagation();
+        
         const commentId = parseInt(button.dataset.id);
         const comment = commentsData.find(c => c.id === commentId);
 
@@ -228,7 +229,7 @@
   }
 
   function initApp() {
-    loadComments();
+    loadComments(); 
 
     addButton.addEventListener('click', addComment);
 
