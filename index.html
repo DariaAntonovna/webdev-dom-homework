@@ -8,42 +8,8 @@
 </head>
 
 <body>
-  <div class="container"> 
+  <div class="container">
     <ul class="comments">
-      <li class="comment">
-        <div class="comment-header">
-          <div>Глеб Фокин</div>
-          <div>12.02.22 12:18</div>
-        </div>
-        <div class="comment-body">
-          <div class="comment-text">
-            Это будет первый комментарий на этой странице
-          </div>
-        </div>
-        <div class="comment-footer">
-          <div class="likes">
-            <span class="likes-counter">3</span>
-            <button class="like-button"></button>
-          </div>
-        </div>
-      </li>
-      <li class="comment">
-        <div class="comment-header">
-          <div>Варвара Н.</div>
-          <div>13.02.22 19:22</div>
-        </div>
-        <div class="comment-body">
-          <div class="comment-text">
-            Мне нравится как оформлена эта страница! ❤
-          </div>
-        </div>
-        <div class="comment-footer">
-          <div class="likes">
-            <span class="likes-counter">75</span>
-            <button class="like-button -active-like"></button>
-          </div>
-        </div>
-      </li>
     </ul>
     <div class="add-form">
       <input type="text" class="add-form-name" placeholder="Введите ваше имя" />
@@ -55,34 +21,69 @@
   </div>
 </body>
 
-<script>
-  "use strict";
+<script type="module">
 
-  const commentsData = [
-    {
-      id: 1,
-      name: "Ivan Ivanov",
-      date: "22.05.25 13:15",
-      text: "Первый комментарий",
-      likes: 3,
-      isLiked: false
-    },
-    {
-      id: 2,
-      name: "Daria Antonova",
-      date: "20.08.25 09:18",
-      text: "Второй комментарий",
-      likes: 4,
-      isLiked: true
-    }
-  ];
+  const PERSONAL_KEY = "daria-antonova";
+
+  function getComments() {
+    return fetch(`https://wedev-api.sky.pro/api/v1/${PERSONAL_KEY}/comments`, {
+      method: "GET"
+    })
+      .then(response => {
+        console.log('Статус ответа:', response.status);
+        if (!response.ok) {
+          throw new Error('Ошибка загрузки комментариев');
+        }
+        return response.json();
+      });
+  }
+
+  function postComment({ name, text }) {
+    return fetch(`https://wedev-api.sky.pro/api/v1/${PERSONAL_KEY}/comments`, {
+      method: "POST",
+      body: JSON.stringify({
+        name: name,
+        text: text,
+      })
+    })
+      .then(response => {
+        console.log('Статус добавления:', response.status);
+        if (!response.ok) {
+          return response.json().then(errorData => {
+            throw new Error(errorData.error || 'Ошибка при добавлении комментария');
+          });
+        }
+        return response.json();
+      });
+  }
+
+
+  function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return unsafe;
+
+    return unsafe
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function formatDate(apiDate) {
+    const date = new Date(apiDate);
+    return `${date.getDate().toString().padStart(2, '0')}.${(date.getMonth() + 1).toString().padStart(2, '0')}.${date.getFullYear().toString().slice(-2)} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+  }
+
+
+  "use strict";
 
   const nameInput = document.querySelector('.add-form-name');
   const textInput = document.querySelector('.add-form-text');
   const addButton = document.querySelector('.add-form-button');
   const commentsList = document.querySelector('.comments');
 
-  let replyingTo = null; 
+  let commentsData = [];
+  let replyingTo = null;
 
   function renderComments() {
     commentsList.innerHTML = '';
@@ -91,24 +92,23 @@
       const likeButtonClass = comment.isLiked ? 'like-button -active-like' : 'like-button';
 
       const commentHTML = `
-      <li class="comment" data-id="${comment.id}">
-        <div class="comment-header">
-          <div>${escapeHtml(comment.name)}</div>
-          <div>${comment.date}</div>
-          </div>
-          <div class="comment-body">
-            <div class="comment-text">
-              ${escapeHtml(comment.text)}
-              </div>
-              </div>
-              <div class="comment-footer">
-                <div class="likes">
-                  <span class="likes-counter">${comment.likes}</span>
-                  <button class="${likeButtonClass}" data-id="${comment.id}"></button>
-                  </div>
-                  </div>
-                  </li>
-                  `;
+    <li class="comment" data-id="${comment.id}">
+      <div class="comment-header">
+        <div>${escapeHtml(comment.name)}</div>
+        <div>${comment.date}</div>
+      </div>
+      <div class="comment-body">
+        <div class="comment-text">
+          ${escapeHtml(comment.text)}
+        </div>
+      </div>
+      <div class="comment-footer">
+        <div class="likes">
+          <span class="likes-counter">${comment.likes}</span>
+          <button class="${likeButtonClass}" data-id="${comment.id}"></button>
+        </div>
+      </div>
+    </li>`;
 
       commentsList.innerHTML += commentHTML;
     });
@@ -117,13 +117,13 @@
     initCommentClickHandlers();
   }
 
-  function initCommentClickHandlers () {
+  function initCommentClickHandlers() {
     const commentElements = document.querySelectorAll('.comment');
 
     commentElements.forEach((commentElement) => {
       commentElement.addEventListener('click', (event) => {
         if (!event.target.closest('.like-button')) {
-          const commentId = parseInt (commentElement.dataset.id);
+          const commentId = parseInt(commentElement.dataset.id);
           replyToComment(commentId);
         }
       });
@@ -134,7 +134,7 @@
     const comment = commentsData.find(c => c.id === commentId);
 
     if (comment) {
-      replyingTo = commentId; 
+      replyingTo = commentId;
       textInput.value = `> ${escapeHtml(comment.name)}: ${escapeHtml(comment.text)}\n\n`;
       textInput.focus();
     }
@@ -164,21 +164,30 @@
     });
   }
 
-  function escapeHtml(unsafe) {
-    if (typeof unsafe !== 'string') return unsafe; 
 
-    return unsafe
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;')
+
+  function loadComments() {
+    console.log('Загружаю комментарии...');
+    getComments()
+      .then(responseData => {
+        console.log('Получены данные:', responseData);
+        commentsData = responseData.comments.map(comment => ({
+          id: comment.id,
+          name: comment.author.name,
+          date: formatDate(comment.date),
+          text: comment.text,
+          likes: comment.likes,
+          isLiked: comment.isLiked
+        }));
+        renderComments();
+      })
+      .catch(error => {
+        console.error('Ошибка загрузки:', error);
+        alert('Не удалось загрузить комментарии: ' + error.message);
+      });
   }
 
-
-
   function addComment() {
-
     const name = nameInput.value.trim();
     const text = textInput.value.trim();
 
@@ -187,30 +196,37 @@
       return;
     }
 
-    const currentDate = new Date();
-    const formattedDate = `${currentDate.getDate().toString().padStart(2, '0')}.${(currentDate.getMonth() + 1).toString().padStart(2, '0')}.${currentDate.getFullYear().toString().slice(-2)} ${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}`;
-
-    const newComment = {
-      id: Date.now(),
-      name: name,
-      date: formattedDate,
-      text: text,
-      likes: 0,
-      isLiked: false,
-      replyTo: replyingTo
-    };
-
-    commentsData.push(newComment);
-    renderComments();
+    if (name.length < 3 || text.length < 3) {
+      alert('Имя и комментарий должны содержать минимум 3 символа');
+      return;
+    }
 
 
-    nameInput.value = '';
-    textInput.value = '';
-    replyingTo = null; 
+    addButton.disabled = true;
+    addButton.textContent = 'Добавляем...';
+
+    postComment({ name, text })
+      .then(() => {
+        console.log('Комментарий добавлен, загружаю обновленный список...');
+        return loadComments();
+      })
+      .then(() => {
+        nameInput.value = '';
+        textInput.value = '';
+        replyingTo = null;
+      })
+      .catch(error => {
+        console.error('Ошибка добавления:', error);
+        alert('Не удалось добавить комментарий: ' + error.message);
+      })
+      .finally(() => {
+        addButton.disabled = false;
+        addButton.textContent = 'Написать';
+      });
   }
 
   function initApp() {
-    renderComments();
+    loadComments();
 
     addButton.addEventListener('click', addComment);
 
@@ -223,9 +239,9 @@
   }
 
   document.addEventListener('DOMContentLoaded', initApp);
-
-
   console.log("It works!");
 </script>
+
+
 
 </html>
