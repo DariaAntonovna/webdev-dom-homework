@@ -29,6 +29,7 @@
     return fetch(`https://wedev-api.sky.pro/api/v1/${PERSONAL_KEY}/comments`, {
       method: "GET"
     })
+    
       .then(response => {
         console.log('Статус ответа:', response.status);
         if (!response.ok) {
