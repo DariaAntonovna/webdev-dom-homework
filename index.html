@@ -29,34 +29,58 @@
     return fetch(`https://wedev-api.sky.pro/api/v1/${PERSONAL_KEY}/comments`, {
       method: "GET"
     })
-
-      .then(response => {
+      .then((response) => {
         console.log('Статус ответа:', response.status);
         if (!response.ok) {
           throw new Error('Ошибка загрузки комментариев');
         }
         return response.json();
+      })
+      .then((responseData) => {
+        return responseData;
+      })
+      .catch((error) => {
+        console.error('Ошибка в getComments:', error);
+        throw error;
       });
   }
 
-  function postComment({ name, text }) {
+  function postComment({ name, text, forceError = false }) {
     return fetch(`https://wedev-api.sky.pro/api/v1/${PERSONAL_KEY}/comments`, {
       method: "POST",
       body: JSON.stringify({
         name: name,
         text: text,
+        forceError: forceError
       })
     })
       .then(response => {
         console.log('Статус добавления:', response.status);
+        if (response.status === 500) {
+          throw new Error('500 - Server Error');
+        }
+
+        if (response.status === 400) {
+          throw new Error('400 - Bad Request');
+        }
+
         if (!response.ok) {
           return response.json().then(errorData => {
-            throw new Error(errorData.error || 'Ошибка при добавлении комментария');
+            throw new Error(errorData.error || `Ошибка ${response.status}`);
           });
         }
         return response.json();
+      })
+      .then((responseData) => {
+        return responseData;
+      })
+      .catch((error) => {
+        console.error('Ошибка в postComment: ', error);
+        throw error;
       });
   }
+
+
 
 
   function escapeHtml(unsafe) {
@@ -69,12 +93,13 @@
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#039;');
   }
-  
+
 
   function formatDate(apiDate) {
     const date = new Date(apiDate);
     return `${date.getDate().toString().padStart(2, '0')}.${(date.getMonth() + 1).toString().padStart(2, '0')}.${date.getFullYear().toString().slice(-2)} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
   }
+
 
 
   "use strict";
@@ -84,17 +109,49 @@
   const addButton = document.querySelector('.add-form-button');
   const commentsList = document.querySelector('.comments');
 
+  let isLoading = false;
   let commentsData = [];
   let replyingTo = null;
 
+  let currentName = '';
+  let currentText = '';
+
+  nameInput.addEventListener('input', (event) => {
+    currentName = event.target.value;
+  });
+
+  textInput.addEventListener('input', (event) => {
+    currentText = event.target.value;
+  });
+
+  function restoreFormData() {
+    nameInput.value = currentName;
+    textInput.value = currentText;
+  }
+
+
+  function renderLoading() {
+    if (isLoading) {
+      commentsList.innerHTML = `
+      <div class="loading">
+        <div>Комментарии загружаются...</div>
+        <div class="loading-spinner">⏳</div>
+      </div>
+      `;
+    }
+  }
+
   function renderComments() {
+    if (isLoading) {
+      return;
+    }
     commentsList.innerHTML = '';
 
     commentsData.forEach((comment) => {
       const likeButtonClass = comment.isLiked ? 'like-button -active-like' : 'like-button';
 
       const commentHTML = `
-    <li class="comment" data-id="${comment.id}">
+        < li class="comment" data-id="${comment.id}" >
       <div class="comment-header">
         <div>${escapeHtml(comment.name)}</div>
         <div>${comment.date}</div>
@@ -110,13 +167,14 @@
           <button class="${likeButtonClass}" data-id="${comment.id}"></button>
         </div>
       </div>
-    </li>`;
+    </li > `;
 
       commentsList.innerHTML += commentHTML;
     });
 
     initLikeButtons();
     initCommentClickHandlers();
+    restoreFormData();
   }
 
   function initCommentClickHandlers() {
@@ -137,18 +195,18 @@
 
     if (comment) {
       replyingTo = commentId;
-      textInput.value = `> ${escapeHtml(comment.name)}: ${escapeHtml(comment.text)}\n\n`;
+      textInput.value = `> ${escapeHtml(comment.name)}: ${escapeHtml(comment.text)} \n\n`;
       textInput.focus();
     }
   }
 
-  function initLikeButtons () {
+  function initLikeButtons() {
     const likeButtons = document.querySelectorAll('.like-button');
 
     likeButtons.forEach((button) => {
       button.addEventListener('click', (event) => {
         event.stopPropagation();
-        
+
         const commentId = parseInt(button.dataset.id);
         const comment = commentsData.find(c => c.id === commentId);
 
@@ -162,6 +220,7 @@
           }
 
           renderComments();
+          
         }
       });
     });
@@ -169,30 +228,14 @@
 
 
 
-  function loadComments() {
-    console.log('Загружаю комментарии...');
-    getComments()
-      .then(responseData => {
-        console.log('Получены данные:', responseData);
-        commentsData = responseData.comments.map(comment => ({
-          id: comment.id,
-          name: comment.author.name,
-          date: formatDate(comment.date),
-          text: comment.text,
-          likes: comment.likes,
-          isLiked: comment.isLiked
-        }));
-        renderComments();
-      })
-      .catch(error => {
-        console.error('Ошибка загрузки:', error);
-        alert('Не удалось загрузить комментарии: ' + error.message);
-      });
-  }
+
 
   function addComment() {
     const name = nameInput.value.trim();
     const text = textInput.value.trim();
+
+    currentName = name;
+    currentText = text;
 
     if (name === '' || text === '') {
       alert('Пожалуйста, заполните все поля!');
@@ -204,46 +247,86 @@
       return;
     }
 
+    document.querySelector('.add-form').style.display = 'none';
+    const loadingElement = document.createElement('div');
+    loadingElement.className = 'add-form-loading';
+    loadingElement.textContent = 'Комментарий добавляется...';
+    document.querySelector('.add-form-row').before(loadingElement);
+
 
     addButton.disabled = true;
     addButton.textContent = 'Добавляем...';
 
-    postComment({ name, text })
+    postComment({ name, text, forceError: true })
       .then(() => {
         console.log('Комментарий добавлен, загружаю обновленный список...');
-        return loadComments();
-      })
-      .then(() => {
-        nameInput.value = '';
-        textInput.value = '';
+        currentName = '';
+        currentText = '';
         replyingTo = null;
+        return loadComments();
       })
       .catch(error => {
         console.error('Ошибка добавления:', error);
-        alert('Не удалось добавить комментарий: ' + error.message);
+
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          alert('Кажется, у вас сломался интернет, попробуйте позже...');
+        } else if (error.message.includes('500')) {
+          alert('Сервер сломался, попробуйте позже');
+        } else if (error.message.includes('400')) {
+          alert('Неверный запрос: ' + error.message);
+        } else {
+          alert('Не удалось добавить комментарий: ' + error.message);
+        }
       })
       .finally(() => {
+        document.querySelector('.add-form').style.display = 'block';
+        loadingElement.remove();
         addButton.disabled = false;
         addButton.textContent = 'Написать';
+        restoreFormData();
       });
   }
 
-  function initApp() {
-    loadComments(); 
+  function loadComments() {
+    console.log('Загружаю комментарии...');
+    isLoading = true;
+    renderLoading();
 
-    addButton.addEventListener('click', addComment);
+    getComments()
+      .then((responseData) => {
+        console.log('Получены данные:', responseData);
+        commentsData = responseData.comments.map((comment) => ({
+          id: comment.id,
+          name: comment.autor.name,
+          date: formatDate(comment.date),
+          text: comment.text,
+          likes: comment.likes,
+          isLiked: comment.isLiked
+        }));
+      })
+      .then(() => {
+        isLoading = false;
+        renderComments();
+      })
+      .catch((error) => {
+        console.error('Ошибка загрузки:', error);
+        isLoading = false;
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          alert('Кажется, у вас сломался интернет, попробуйте позже...');
+        } else if (error.message.includes('500')) {
+          alert('Сервер сломался, попробуйте позже');
+        } else {
+          alert('Не удалось загрузить комментарии: ' + error.message);
+        }
 
-    textInput.addEventListener('keypress', (event) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        addComment();
-      }
-    });
-  }
+        renderComments();
 
-  document.addEventListener('DOMContentLoaded', initApp);
-  console.log("It works!");
-  
+      });
+  }  
+  loadComments();
+  addButton.addEventListener('click', addComment);
+
+
 </script>
 
 
